@@ -1,4 +1,49 @@
+# Core Django
 Django==5.2.1
+asgiref==3.8.1
+sqlparse==0.5.3
+pytz==2025.2
+
+# Database
+psycopg2-binary==2.9.9  # For PostgreSQL support
+
+# REST Framework
 djangorestframework==3.14.0
-# djangorestframework-simplejwt==5.3.1  # For token auth
-africastalking==1.2.9
+djangorestframework-simplejwt==5.5.0
+PyJWT==2.9.0
+
+# Africa's Talking
+africastalking==1.2.9  # Updated to latest stable version
+
+# Environment Management
+python-dotenv==1.0.1
+
+# HTTP Requests
+requests==2.32.3
+urllib3==2.4.0
+certifi==2025.4.26
+charset-normalizer==3.4.2
+idna==3.10
+
+# Development (optional)
+schema==0.7.7
+
+
+# for ci/cd
+
+pytest==8.2.0
+pytest-django==4.7.0
+coverage==7.5.0
+psycopg2-binary==2.9.9
+
+
+django-environ==0.11.2
+
+
+django-cors-headers==4.2.0
+
+
+psycopg2-binary==2.9.9  # For PostgreSQL
+
+
+# pip install -r requirements.txt
