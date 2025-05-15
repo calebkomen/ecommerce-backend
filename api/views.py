@@ -1,8 +1,10 @@
 from rest_framework import viewsets, generics, status, permissions
 from rest_framework.response import Response
+from rest_framework.exceptions import NotFound
 from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth.models import User
 from django.db import IntegrityError
+from django.shortcuts import get_object_or_404
 from .models import Customer, Order
 from .serializers import (
     CustomerSerializer, 
@@ -16,17 +18,46 @@ import logging
 logger = logging.getLogger(__name__)
 
 class CustomerViewSet(viewsets.ModelViewSet):
-    queryset = Customer.objects.all()
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Customer.objects.all()  # Required for DefaultRouter
+
+    def get_queryset(self):
+        """Only return customers belonging to the current user"""
+        return self.queryset.filter(user=self.request.user)
+
+    def get_object(self):
+        """Ensure users can only access their own customer profile"""
+        obj = super().get_object()
+        if obj.user != self.request.user:
+            raise NotFound("Customer profile not found")
+        return obj
+
+    def perform_create(self, serializer):
+        """Automatically associate customer with current user"""
+        serializer.save(user=self.request.user)
 
 class OrderViewSet(viewsets.ModelViewSet):
-    queryset = Order.objects.all()
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
+    queryset = Order.objects.all()  # Required for DefaultRouter
+    
+    def get_queryset(self):
+        """Only return orders belonging to the current user"""
+        return self.queryset.filter(customer__user=self.request.user)
+
+    def get_object(self):
+        """Ensure users can only access their own orders"""
+        obj = super().get_object()
+        if obj.customer.user != self.request.user:
+            raise NotFound("Order not found")
+        return obj
     
     def perform_create(self, serializer):
-        order = serializer.save()
+        """Handle order creation with SMS notification"""
+        customer = get_object_or_404(Customer, user=self.request.user)
+        order = serializer.save(customer=customer)
+        
         try:
             message = f"Hello {order.customer.user.username}, your order #{order.id} for {order.item} (KSh{order.amount}) has been received."
             sms_response = SMSService.send(order.customer.phone, message)
@@ -53,7 +84,7 @@ class RegisterView(generics.CreateAPIView):
             }, status=status.HTTP_201_CREATED)
         except IntegrityError as e:
             return Response(
-                {"error": "Registration failed - possibly duplicate data"},
+                {"error": "Registration failed - username or customer code may already exist"},
                 status=status.HTTP_400_BAD_REQUEST
             )
 
