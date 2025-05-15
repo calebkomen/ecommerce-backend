@@ -14,6 +14,8 @@ class Order(models.Model):
     item = models.CharField(max_length=100)
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     created_at = models.DateTimeField(auto_now_add=True)
+    sms_status = models.CharField(max_length=20, default='pending')
+    sms_response = models.JSONField(null=True, blank=True)
     
     class Meta:
         ordering = ['-created_at']

@@ -20,51 +20,59 @@ logger = logging.getLogger(__name__)
 class CustomerViewSet(viewsets.ModelViewSet):
     serializer_class = CustomerSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Customer.objects.all()  # Required for DefaultRouter
+    queryset = Customer.objects.all()
 
     def get_queryset(self):
-        """Only return customers belonging to the current user"""
         return self.queryset.filter(user=self.request.user)
 
     def get_object(self):
-        """Ensure users can only access their own customer profile"""
         obj = super().get_object()
         if obj.user != self.request.user:
             raise NotFound("Customer profile not found")
         return obj
 
     def perform_create(self, serializer):
-        """Automatically associate customer with current user"""
         serializer.save(user=self.request.user)
 
 class OrderViewSet(viewsets.ModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
-    queryset = Order.objects.all()  # Required for DefaultRouter
+    queryset = Order.objects.all()
     
     def get_queryset(self):
-        """Only return orders belonging to the current user"""
         return self.queryset.filter(customer__user=self.request.user)
 
     def get_object(self):
-        """Ensure users can only access their own orders"""
         obj = super().get_object()
         if obj.customer.user != self.request.user:
             raise NotFound("Order not found")
         return obj
     
     def perform_create(self, serializer):
-        """Handle order creation with SMS notification"""
         customer = get_object_or_404(Customer, user=self.request.user)
         order = serializer.save(customer=customer)
         
+        # Enhanced SMS verification with detailed logging
         try:
             message = f"Hello {order.customer.user.username}, your order #{order.id} for {order.item} (KSh{order.amount}) has been received."
-            sms_response = SMSService.send(order.customer.phone, message)
-            if sms_response.get('status') == 'failed':
-                logger.warning(f"Order #{order.id} created but SMS failed")
+            
+            # Test SMS in development
+            if settings.DEBUG:
+                logger.info(f"[DEV] SMS would be sent to {order.customer.phone}: {message}")
+                sms_response = {'status': 'dev_success'}
+            else:
+                sms_response = SMSService.send(order.customer.phone, message)
+            
+            # Log full response
+            logger.info(f"SMS attempt for order #{order.id}. Status: {sms_response.get('status')}. Response: {sms_response}")
+            
+            # Verify successful SMS delivery
+            if sms_response.get('status') != 'success':
+                logger.error(f"SMS failed for order #{order.id}. Response: {sms_response}")
+                
         except Exception as e:
-            logger.error(f"Error processing order #{order.id}: {str(e)}")
+            logger.error(f"SMS error for order #{order.id}: {str(e)}", exc_info=True)
+            # Continue with order creation even if SMS fails
 
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
